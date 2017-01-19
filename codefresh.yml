@@ -1,0 +1,42 @@
+version: '1.0'
+
+steps:
+  build_step:
+    type: build
+    description: UC - build step
+    image_name: codefreshio/yaml-image-metadata
+    dockerfile: Dockerfile
+    tag: ${{CF_BRANCH}}
+    metadata: # Declare the metadata attribute
+      set: # Specify the set operation
+        - qa: pending
+        - commit_message: ${{CF_COMMIT_MESSAGE}}
+        - exit_code: 0
+        - is_main:
+          evaluate: "'${{CF_BRANCH}}' == 'master'"
+
+  unit_test:
+    image: node:latest
+    commands:
+      - npm -v
+      - echo 'start test' # command to start unit test
+    on_success: # Execute only once the step succeeded
+        metadata: # Declare the metadata attribute
+          set: # Specify the set operation
+            - ${{build_step.imageId}}: # Select any number of target images
+              - qa: pending
+              - CF_QUALITY: true
+
+    on_fail: # Execute only once the step failed
+      metadata: # Declare the metadata attribute
+        set: # Specify the set operation
+          - ${{build_step.imageId}}: # Select any number of target images
+            - exit_code: 1
+            - CF_QUALITY: false
+
+    on_finish: # Execute in any case
+      metadata: # Declare the metadata attribute
+        set: # Specify the set operation
+          - ${{build_step.imageId}}: # Select any number of target images
+            - is_main:
+              evaluate: "’${{CF_BRANCH}}’ == ‘master’"
